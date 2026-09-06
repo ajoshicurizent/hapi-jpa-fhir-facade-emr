@@ -54,6 +54,51 @@ public class EmrPatientRepository {
 		}
 	}
 
+	public Optional<EmrPatientRow> findByMrn(String mrn) {
+		String sql = "SELECT " + SELECT_COLUMNS + " FROM patient WHERE mrn = ?";
+		try (Connection connection = emrDataSource.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql)) {
+			statement.setString(1, mrn);
+			try (ResultSet resultSet = statement.executeQuery()) {
+				if (resultSet.next()) {
+					return Optional.of(map(resultSet));
+				}
+				return Optional.empty();
+			}
+		} catch (SQLException e) {
+			throw new IllegalStateException("Failed to read EMR patient by MRN", e);
+		}
+	}
+
+	public List<EmrPatientRow> findByGiven(String given, boolean exact, boolean contains) {
+		String sql;
+		if (exact) {
+			sql = "SELECT " + SELECT_COLUMNS + " FROM patient WHERE LOWER(given_name) = LOWER(?) ORDER BY id";
+		} else if (contains) {
+			sql = "SELECT " + SELECT_COLUMNS + " FROM patient WHERE given_name ILIKE ? ESCAPE '\\' ORDER BY id";
+		} else {
+			sql = "SELECT " + SELECT_COLUMNS + " FROM patient WHERE given_name ILIKE ? ESCAPE '\\' ORDER BY id";
+		}
+		String pattern = exact ? given : (contains ? "%" + escapeLike(given) + "%" : escapeLike(given) + "%");
+		List<EmrPatientRow> rows = new ArrayList<>();
+		try (Connection connection = emrDataSource.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql)) {
+			statement.setString(1, pattern);
+			try (ResultSet resultSet = statement.executeQuery()) {
+				while (resultSet.next()) {
+					rows.add(map(resultSet));
+				}
+			}
+			return rows;
+		} catch (SQLException e) {
+			throw new IllegalStateException("Failed to search EMR patients by given name", e);
+		}
+	}
+
+	private static String escapeLike(String value) {
+		return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+	}
+
 	public List<EmrPatientRow> findAll() {
 		String sql = "SELECT " + SELECT_COLUMNS + " FROM patient ORDER BY id";
 		List<EmrPatientRow> rows = new ArrayList<>();

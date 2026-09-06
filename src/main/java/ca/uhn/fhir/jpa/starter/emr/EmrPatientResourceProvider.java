@@ -25,6 +25,7 @@ import ca.uhn.fhir.rest.annotation.Update;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.param.TokenParam;
 import ca.uhn.fhir.rest.server.IResourceProvider;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
@@ -71,15 +72,49 @@ public class EmrPatientResourceProvider implements IResourceProvider {
 	}
 
 	@Search
-	public List<Patient> search(@OptionalParam(name = IAnyResource.SP_RES_ID) TokenParam id) {
-		if (id == null || id.isEmpty()) {
-			return repository.findAll().stream().map(this::toFhir).toList();
+	public List<Patient> search(
+			@OptionalParam(name = IAnyResource.SP_RES_ID) TokenParam id,
+			@OptionalParam(name = Patient.SP_IDENTIFIER) TokenParam identifier,
+			@OptionalParam(name = Patient.SP_GIVEN) StringParam given) {
+		final Integer emrId;
+		if (id != null && !id.isEmpty()) {
+			String value = id.getValue();
+			if (value == null || !value.matches("[0-9]+")) {
+				return List.of();
+			}
+			emrId = Integer.parseInt(value);
+		} else {
+			emrId = null;
 		}
-		String value = id.getValue();
-		if (value == null || !value.matches("[0-9]+")) {
-			return List.of();
+		final String mrn;
+		if (identifier != null && !identifier.isEmpty()) {
+			String system = identifier.getSystem();
+			mrn = identifier.getValue();
+			if (mrn == null || mrn.isBlank()) {
+				return List.of();
+			}
+			if (system != null && !system.isBlank() && !MRN_SYSTEM.equals(system)) {
+				return List.of();
+			}
+		} else {
+			mrn = null;
 		}
-		return repository.findById(Integer.parseInt(value)).map(this::toFhir).map(List::of).orElseGet(List::of);
+		List<EmrPatientRow> rows;
+		if (given != null && !given.isEmpty() && given.getValue() != null && !given.getValue().isBlank()) {
+			boolean contains = ":contains".equals(given.getQueryParameterQualifier());
+			rows = repository.findByGiven(given.getValue().trim(), given.isExact(), contains);
+		} else if (mrn != null) {
+			rows = repository.findByMrn(mrn).map(List::of).orElseGet(List::of);
+		} else if (emrId != null) {
+			rows = repository.findById(emrId).map(List::of).orElseGet(List::of);
+		} else {
+			rows = repository.findAll();
+		}
+		return rows.stream()
+				.filter(row -> emrId == null || row.id() == emrId)
+				.filter(row -> mrn == null || mrn.equals(row.mrn()))
+				.map(this::toFhir)
+				.toList();
 	}
 
 	@Create

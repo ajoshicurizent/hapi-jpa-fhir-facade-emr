@@ -2,6 +2,7 @@ package ca.uhn.fhir.jpa.starter.emr;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 import javax.sql.DataSource;
@@ -53,11 +54,18 @@ public class EmrDataSourceConfig {
 	ApplicationRunner emrConnectionCheck(@Qualifier("emrDataSource") DataSource emrDataSource) {
 		return args -> {
 			try (Connection connection = emrDataSource.getConnection();
-					Statement statement = connection.createStatement();
-					ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM patient")) {
-				resultSet.next();
-				log.info("EMR facade database connected. patient rows={}", resultSet.getInt(1));
+					Statement statement = connection.createStatement()) {
+				int patients = count(statement, "SELECT COUNT(*) FROM patient");
+				int vitals = count(statement, "SELECT COUNT(*) FROM vital_sign");
+				log.info("EMR facade database connected. patient rows={}, vital_sign rows={}", patients, vitals);
 			}
 		};
+	}
+
+	private static int count(Statement statement, String sql) throws SQLException {
+		try (ResultSet resultSet = statement.executeQuery(sql)) {
+			resultSet.next();
+			return resultSet.getInt(1);
+		}
 	}
 }
