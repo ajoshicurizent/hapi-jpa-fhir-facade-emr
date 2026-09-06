@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Curizent FHIR Profile Validator</title>
+	<style>
+		:root {
+			--bg: #f4f6f8;
+			--card: #ffffff;
+			--text: #1f2933;
+			--muted: #52606d;
+			--line: #d9e2ec;
+			--brand: #0b6e99;
+			--brand-dark: #084c6b;
+			--ok: #0f7b3a;
+			--ok-bg: #e3f8ec;
+			--warn: #b45309;
+			--warn-bg: #fff6e5;
+			--err: #b42318;
+			--err-bg: #fdecea;
+			--info: #1d4ed8;
+			--info-bg: #e8f0fe;
+			--shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			font-family: "Segoe UI", Tahoma, sans-serif;
+			background: var(--bg);
+			color: var(--text);
+		}
+		header {
+			background: linear-gradient(135deg, #0b6e99, #0e8ec4);
+			color: #fff;
+			padding: 18px 20px 22px;
+		}
+		.brand {
+			display: flex;
+			align-items: center;
+			gap: 20px;
+			max-width: 980px;
+			margin: 0 auto;
+		}
+		.logo {
+			height: 88px;
+			width: auto;
+			max-width: 240px;
+			object-fit: contain;
+			display: block;
+			flex-shrink: 0;
+		}
+		header h1 { margin: 0 0 6px; font-size: 1.6rem; }
+		header p { margin: 0; opacity: 0.92; }
+		main {
+			max-width: 980px;
+			margin: -16px auto 40px;
+			padding: 0 16px;
+		}
+		.card {
+			background: var(--card);
+			border: 1px solid var(--line);
+			border-radius: 12px;
+			box-shadow: var(--shadow);
+			padding: 20px;
+			margin-bottom: 16px;
+		}
+		label {
+			display: block;
+			font-weight: 600;
+			margin-bottom: 6px;
+		}
+		.hint { color: var(--muted); font-size: 0.92rem; margin: 0 0 10px; }
+		select, textarea, button, input[type="text"] {
+			font: inherit;
+		}
+		input[type="text"] {
+			width: 100%;
+			padding: 10px 12px;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			margin-bottom: 16px;
+		}
+		.profile-list {
+			max-height: 240px;
+			overflow: auto;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 8px 10px;
+			margin-bottom: 8px;
+			background: #fff;
+		}
+		.profile-list .group {
+			font-size: 0.78rem;
+			font-weight: 700;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+			color: var(--muted);
+			margin: 8px 0 4px;
+		}
+		.profile-row {
+			display: flex;
+			align-items: flex-start;
+			gap: 8px;
+			padding: 4px 0;
+		}
+		.profile-row input { margin-top: 3px; }
+		.profile-row .url {
+			display: block;
+			color: var(--muted);
+			font-size: 0.8rem;
+			font-family: Consolas, "Courier New", monospace;
+			word-break: break-all;
+		}
+		.toolbar {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 12px;
+			align-items: center;
+			margin: 8px 0 16px;
+			color: var(--muted);
+			font-size: 0.9rem;
+		}
+		textarea {
+			width: 100%;
+			min-height: 300px;
+			padding: 12px;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			font-family: Consolas, "Courier New", monospace;
+			font-size: 0.92rem;
+			line-height: 1.45;
+			resize: vertical;
+		}
+		.actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px;
+			margin-top: 12px;
+		}
+		button {
+			border: 0;
+			border-radius: 8px;
+			padding: 10px 16px;
+			cursor: pointer;
+			font-weight: 600;
+		}
+		button:disabled { opacity: 0.65; cursor: wait; }
+		.primary { background: var(--brand); color: #fff; }
+		.primary:hover:not(:disabled) { background: var(--brand-dark); }
+		.secondary { background: #e4eaf0; color: var(--text); }
+		.summary {
+			padding: 12px 14px;
+			border-radius: 8px;
+			font-weight: 600;
+			margin-bottom: 12px;
+		}
+		.summary.ok { background: var(--ok-bg); color: var(--ok); }
+		.summary.warn { background: var(--warn-bg); color: var(--warn); }
+		.summary.err { background: var(--err-bg); color: var(--err); }
+		.issue {
+			border: 1px solid var(--line);
+			border-left-width: 5px;
+			border-radius: 8px;
+			padding: 10px 12px;
+			margin-bottom: 10px;
+			background: #fff;
+		}
+		.issue.error, .issue.fatal { border-left-color: var(--err); background: var(--err-bg); }
+		.issue.warning { border-left-color: var(--warn); background: var(--warn-bg); }
+		.issue.information { border-left-color: var(--info); background: var(--info-bg); }
+		.issue .sev { text-transform: uppercase; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; }
+		.issue .path { color: var(--muted); font-size: 0.85rem; margin-top: 4px; font-family: Consolas, "Courier New", monospace; }
+		details { margin-top: 12px; }
+		pre {
+			overflow: auto;
+			background: #0f172a;
+			color: #e2e8f0;
+			padding: 12px;
+			border-radius: 8px;
+			font-size: 0.82rem;
+		}
+		footer {
+			text-align: center;
+			color: var(--muted);
+			font-size: 0.85rem;
+			padding: 8px 16px 28px;
+		}
+		#callUrl { font-family: Consolas, "Courier New", monospace; }
+		a { color: inherit; }
+	</style>
+</head>
+<body>
+	<header>
+		<div class="brand">
+			<img class="logo" src="/validate/curizent-logo-white.png" alt="Curizent">
+			<div>
+				<h1>Curizent FHIR Profile Validator</h1>
+				<p>Paste a Patient (or other) resource instance, pick one profile, and validate with <code>$validate</code>.</p>
+			</div>
+		</div>
+	</header>
+	<main>
+		<section class="card">
+			<label>Profile (choose one)</label>
+			<p class="hint" id="profileHint">Loading StructureDefinitions from this HAPI FHIR server…</p>
+			<div id="profileList" class="profile-list"></div>
+			<div class="toolbar">
+				<label style="font-weight:500;margin:0;">
+					<input type="checkbox" id="matchType" checked>
+					Only show profiles for the pasted resource type
+				</label>
+			</div>
+
+			<label for="customProfile">Or paste a profile URL</label>
+			<p class="hint">If filled, this profile is used instead of the radio selection. You can enter a profile provided by the course, or a FHIR standard profile. For example, custom profile provided by the course: <code>http://courses.ajoshi.org/fhir/StructureDefinition/fhir-course-patient01</code> or FHIR standard profile for Patient: <code>http://hl7.org/fhir/StructureDefinition/Patient</code>. Please do not write server url with <code>$validate</code> path.</p>
+			<input id="customProfile" type="text" placeholder="http://courses.ajoshi.org/fhir/StructureDefinition/fhir-course-patient01">
+
+			<label for="resource">Resource instance (JSON or XML)</label>
+			<p class="hint">Paste your own resource here, or use <strong>Load resource from file</strong> to open a JSON/XML file from your computer. <strong>Try example</strong> only fills a built-in sample Patient. It does not open your files.</p>
+			<textarea id="resource" spellcheck="false" placeholder='{"resourceType":"Patient", ...}'></textarea>
+			<input id="resourceFile" type="file" accept=".json,.xml,.txt,application/json,application/xml,text/xml,text/plain" hidden>
+
+			<div class="actions">
+				<button id="validateBtn" class="primary" type="button">Validate Resource</button>
+				<button id="fileBtn" class="secondary" type="button">Load resource from file</button>
+				<button id="exampleBtn" class="secondary" type="button">Try example</button>
+				<button id="clearBtn" class="secondary" type="button">Clear</button>
+			</div>
+		</section>
+
+		<section id="results" class="card" hidden>
+			<h2 style="margin-top:0">Results</h2>
+			<div id="summary"></div>
+			<div id="issues"></div>
+			<details>
+				<summary>Raw OperationOutcome</summary>
+				<pre id="raw"></pre>
+			</details>
+		</section>
+	</main>
+	<footer>
+		<div id="callUrl">POST /fhir/{type}/$validate?profile=...</div>
+	</footer>
+	<script>
+		const COURSE_PREFIXES = [
+			"http://courses.ajoshi.org/fhir/",
+			"http://ghh.org/fhir/"
+		];
+		const FALLBACK_PROFILES = [
+			{ url: "http://courses.ajoshi.org/fhir/StructureDefinition/fhir-course-patient01", name: "FHIR course Patient Profile 01", type: "Patient" },
+			{ url: "http://courses.ajoshi.org/fhir/StructureDefinition/MyPatient", name: "MyPatient", type: "Patient" }
+		];
+
+		const profileList = document.getElementById("profileList");
+		const profileHint = document.getElementById("profileHint");
+		const customProfile = document.getElementById("customProfile");
+		const matchType = document.getElementById("matchType");
+		const resourceBox = document.getElementById("resource");
+		const validateBtn = document.getElementById("validateBtn");
+		const results = document.getElementById("results");
+		const summary = document.getElementById("summary");
+		const issuesEl = document.getElementById("issues");
+		const raw = document.getElementById("raw");
+		const requestedProfile = new URLSearchParams(window.location.search).get("profile") || "";
+
+		let allProfiles = [];
+
+		matchType.addEventListener("change", renderProfiles);
+		resourceBox.addEventListener("input", () => {
+			if (matchType.checked) {
+				renderProfiles();
+			}
+		});
+		const resourceFile = document.getElementById("resourceFile");
+		document.getElementById("fileBtn").addEventListener("click", () => resourceFile.click());
+		resourceFile.addEventListener("change", loadResourceFromFile);
+		document.getElementById("exampleBtn").addEventListener("click", loadExample);
+		document.getElementById("clearBtn").addEventListener("click", () => {
+			resourceBox.value = "";
+			results.hidden = true;
+			renderProfiles();
+		});
+		validateBtn.addEventListener("click", validateResource);
+		resourceBox.addEventListener("keydown", (event) => {
+			if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+				validateResource();
+			}
+		});
+
+		loadProfiles();
+
+		function fhirBase() {
+			const path = window.location.pathname.replace(/\/validate(\/index\.html)?\/?$/, "");
+			return window.location.origin + path + "/fhir";
+		}
+
+		function isCourseProfile(profile) {
+			return COURSE_PREFIXES.some((prefix) => profile.url.startsWith(prefix));
+		}
+
+		function pastedResourceType() {
+			const text = resourceBox.value.trim();
+			if (!text) {
+				return "";
+			}
+			const format = detectFormat(text);
+			if (!format.ok) {
+				return "";
+			}
+			try {
+				return resourceTypeOf(text, format.type);
+			} catch (error) {
+				return "";
+			}
+		}
+
+		async function loadProfiles() {
+			try {
+				allProfiles = await fetchConstraintProfiles();
+				if (!allProfiles.length) {
+					allProfiles = FALLBACK_PROFILES.slice();
+					profileHint.textContent = "No resource profiles were returned. Using the course Patient profiles.";
+				} else {
+					profileHint.textContent = allProfiles.length + " resource profile(s) available. Select one, then validate.";
+				}
+			} catch (error) {
+				allProfiles = FALLBACK_PROFILES.slice();
+				profileHint.textContent = "Could not load profiles from the server (" + error.message + "). Using course fallbacks.";
+			}
+			const missing = requestedProfile
+				&& !allProfiles.some((profile) => profile.url === requestedProfile);
+			if (missing && !customProfile.value.trim()) {
+				customProfile.value = requestedProfile;
+			}
+			renderProfiles();
+		}
+
+		async function fetchConstraintProfiles() {
+			const found = [];
+			const seen = new Set();
+			let next = fhirBase() + "/StructureDefinition?derivation=constraint&kind=resource"
+				+ "&_elements=url,name,title,type,id&_count=50";
+			while (next) {
+				const response = await fetch(next, { headers: { Accept: "application/fhir+json" } });
+				if (!response.ok) {
+					throw new Error("HTTP " + response.status);
+				}
+				const bundle = await response.json();
+				(bundle.entry || []).forEach((entry) => {
+					const resource = entry.resource;
+					if (!resource || !resource.url || seen.has(resource.url)) {
+						return;
+					}
+					seen.add(resource.url);
+					found.push({
+						url: resource.url,
+						name: resource.title || resource.name || resource.id || resource.url,
+						type: resource.type || ""
+					});
+				});
+				const link = (bundle.link || []).find((item) => item.relation === "next");
+				next = link ? link.url : null;
+			}
+			found.sort((a, b) => {
+				const course = Number(isCourseProfile(b)) - Number(isCourseProfile(a));
+				if (course) {
+					return course;
+				}
+				return (a.type + a.name).localeCompare(b.type + b.name);
+			});
+			return found;
+		}
+
+		function renderProfiles() {
+			const previouslySelected = selectedProfileUrl();
+			const type = matchType.checked ? pastedResourceType() : "";
+			let visible = allProfiles.filter((profile) => {
+				if (type && profile.type && profile.type !== type) {
+					return false;
+				}
+				return true;
+			});
+			if (!visible.length) {
+				visible = allProfiles.slice();
+			}
+
+			profileList.innerHTML = "";
+			let currentType = null;
+			visible.forEach((profile) => {
+				if (profile.type !== currentType) {
+					currentType = profile.type;
+					const group = document.createElement("div");
+					group.className = "group";
+					group.textContent = currentType || "Profile";
+					profileList.appendChild(group);
+				}
+				const row = document.createElement("label");
+				row.className = "profile-row";
+				const radio = document.createElement("input");
+				radio.type = "radio";
+				radio.name = "profile";
+				radio.value = profile.url;
+				radio.checked = shouldSelect(profile, previouslySelected, visible);
+				row.appendChild(radio);
+				const text = document.createElement("span");
+				text.innerHTML = escapeHtml(profile.name) + "<span class='url'>" + escapeHtml(profile.url) + "</span>";
+				row.appendChild(text);
+				profileList.appendChild(row);
+			});
+		}
+
+		function shouldSelect(profile, previouslySelected, visible) {
+			if (previouslySelected) {
+				return profile.url === previouslySelected;
+			}
+			if (requestedProfile) {
+				return profile.url === requestedProfile;
+			}
+			const courseVisible = visible.filter(isCourseProfile);
+			if (courseVisible.length) {
+				return profile.url === courseVisible[0].url;
+			}
+			return visible[0] && profile.url === visible[0].url;
+		}
+
+		function selectedProfileUrl() {
+			const extra = customProfile.value.trim();
+			if (extra) {
+				return extra;
+			}
+			const radio = profileList.querySelector("input[name=profile]:checked");
+			if (radio) {
+				return radio.value;
+			}
+			return requestedProfile;
+		}
+
+		function loadResourceFromFile() {
+			const file = resourceFile.files && resourceFile.files[0];
+			resourceFile.value = "";
+			if (!file) {
+				return;
+			}
+			if (file.size > 2 * 1024 * 1024) {
+				showClientError("The selected file is larger than 2 MB. Paste a smaller resource instance.");
+				return;
+			}
+			const reader = new FileReader();
+			reader.onload = () => {
+				resourceBox.value = String(reader.result || "").trim();
+				results.hidden = true;
+				renderProfiles();
+			};
+			reader.onerror = () => {
+				showClientError("Could not read that file. Try pasting the JSON or XML instead.");
+			};
+			reader.readAsText(file);
+		}
+
+		function loadExample() {
+			const profile = selectedProfileUrl()
+				|| "http://courses.ajoshi.org/fhir/StructureDefinition/fhir-course-patient01";
+			const example = {
+				resourceType: "Patient",
+				id: "PatientExample",
+				meta: { profile: [profile] },
+				name: [{ family: "Pond", given: ["James"] }]
+			};
+			resourceBox.value = JSON.stringify(example, null, 2);
+			renderProfiles();
+		}
+
+		function detectFormat(text) {
+			const trimmed = text.trim();
+			if (trimmed.startsWith("<")) {
+				return { ok: true, type: "xml", contentType: "application/fhir+xml" };
+			}
+			try {
+				JSON.parse(trimmed);
+				return { ok: true, type: "json", contentType: "application/fhir+json" };
+			} catch (error) {
+				return { ok: false, message: "The text is not valid JSON or XML. " + error.message };
+			}
+		}
+
+		function resourceTypeOf(text, format) {
+			if (format === "json") {
+				const parsed = JSON.parse(text);
+				return parsed.resourceType || "Patient";
+			}
+			const match = text.match(/<(?:\w+:)?(\w+)\b/);
+			return match ? match[1] : "Patient";
+		}
+
+		async function validateResource() {
+			const body = resourceBox.value.trim();
+			if (!body) {
+				showClientError("Paste a FHIR resource instance first.");
+				return;
+			}
+
+			const format = detectFormat(body);
+			if (!format.ok) {
+				showClientError(format.message);
+				return;
+			}
+
+			const profile = selectedProfileUrl();
+			if (!profile) {
+				showClientError("Select one profile, or enter a profile URL.");
+				return;
+			}
+
+			const resourceType = resourceTypeOf(body, format.type);
+			const url = fhirBase() + "/" + encodeURIComponent(resourceType)
+				+ "/$validate?profile=" + encodeURIComponent(profile);
+			document.getElementById("callUrl").textContent = "POST " + url.replace(window.location.origin, "");
+
+			validateBtn.disabled = true;
+			validateBtn.textContent = "Validating...";
+			results.hidden = false;
+			summary.className = "summary";
+			summary.textContent = "Calling $validate with the selected profile. If the JSON also has meta.profile, those claims are checked too.";
+			issuesEl.innerHTML = "";
+			raw.textContent = "";
+
+			try {
+				const response = await fetch(url, {
+					method: "POST",
+					headers: {
+						"Content-Type": format.contentType,
+						Accept: "application/fhir+json"
+					},
+					body: body
+				});
+				const text = await response.text();
+				let outcome;
+				try {
+					outcome = JSON.parse(text);
+				} catch (error) {
+					showClientError("Server returned a non-JSON response (HTTP " + response.status + ").", text);
+					return;
+				}
+				renderOutcome(outcome, response.status);
+			} catch (error) {
+				showClientError("Could not reach the FHIR server: " + error.message);
+			} finally {
+				validateBtn.disabled = false;
+				validateBtn.textContent = "Validate Resource";
+			}
+		}
+
+		function showClientError(message, details) {
+			results.hidden = false;
+			summary.className = "summary err";
+			summary.textContent = message;
+			issuesEl.innerHTML = "";
+			raw.textContent = details || "";
+		}
+
+		function renderOutcome(outcome, httpStatus) {
+			raw.textContent = JSON.stringify(outcome, null, 2);
+			const issues = Array.isArray(outcome.issue) ? outcome.issue : [];
+			const counts = { fatal: 0, error: 0, warning: 0, information: 0 };
+			issues.forEach((issue) => {
+				const severity = (issue.severity || "information").toLowerCase();
+				counts[severity] = (counts[severity] || 0) + 1;
+			});
+
+			const failures = (counts.fatal || 0) + (counts.error || 0);
+			if (failures > 0) {
+				summary.className = "summary err";
+				summary.textContent = "Validation failed: " + failures + " error(s)"
+					+ (counts.warning ? ", " + counts.warning + " warning(s)" : "")
+					+ " (HTTP " + httpStatus + ").";
+			} else if (counts.warning > 0) {
+				summary.className = "summary warn";
+				summary.textContent = "Valid with warnings: " + counts.warning + " warning(s).";
+			} else {
+				summary.className = "summary ok";
+				summary.textContent = issues.length
+					? "Valid. No errors or warnings against the selected profile."
+					: "Valid. The server returned no issues.";
+			}
+
+			issuesEl.innerHTML = "";
+			issues.forEach((issue) => {
+				const div = document.createElement("div");
+				const severity = (issue.severity || "information").toLowerCase();
+				div.className = "issue " + severity;
+				const path = (issue.expression && issue.expression[0])
+					|| (issue.location && issue.location[0])
+					|| "";
+				div.innerHTML = "<div class='sev'>" + escapeHtml(severity)
+					+ (issue.code ? " · " + escapeHtml(issue.code) : "")
+					+ "</div><div>" + escapeHtml(issue.diagnostics || (issue.details && issue.details.text) || "No diagnostics")
+					+ "</div>"
+					+ (path ? "<div class='path'>" + escapeHtml(path) + "</div>" : "");
+				issuesEl.appendChild(div);
+			});
+		}
+
+		function escapeHtml(value) {
+			return String(value)
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
+				.replace(/"/g, "&quot;");
+		}
+	</script>
+</body>
+</html>

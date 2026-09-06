@@ -1,0 +1,27 @@
+apiVersion: v2
+name: hapi-fhir-jpaserver
+description: A Helm chart for deploying the HAPI FHIR JPA server starter on Kubernetes.
+type: application
+home: https://github.com/hapifhir/hapi-fhir-jpaserver-starter
+sources:
+  - https://github.com/hapifhir/hapi-fhir-jpaserver-starter
+dependencies:
+  - name: postgres
+    version: 0.19.3
+    repository: oci://registry-1.docker.io/cloudpirates
+    condition: postgres.enabled
+appVersion: 8.8.0
+version: 0.24.0
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/operator: "false"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+    - url: https://artifacthub.io/packages/helm/cloudpirates-postgres/postgres
+  artifacthub.io/changes: |
+    # When using the list of objects option the valid supported kinds are
+    # added, changed, deprecated, removed, fixed, and security.
+    - kind: changed
+      description: "BREAKING CHANGE: Migrated from the Bitnami sub-chart to Cloudpirates Postgres chart. This may require changes to your values.yaml under the new `postgres`-key."
